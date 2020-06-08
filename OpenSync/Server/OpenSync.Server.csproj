@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <UserSecretsId>041cbc3f-531c-4e7b-9f6b-dd90ce49a853</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Auth" Version="1.46.0" />
+    <PackageReference Include="Google.Apis.YouTube.v3" Version="1.45.0.1929" />
+    <PackageReference Include="Microsoft.AspNetCore.AzureKeyVault.HostingStartup" Version="2.0.4" />
+    <PackageReference Include="Microsoft.AspNetCore.Components.WebAssembly.Server" Version="3.2.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\Client\OpenSync.Client.csproj" />
+    <ProjectReference Include="..\Shared\OpenSync.Shared.csproj" />
+  </ItemGroup>
+</Project>

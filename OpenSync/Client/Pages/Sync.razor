@@ -1,0 +1,297 @@
+﻿@page "/"
+
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.Threading;
+@using Google.Apis.Auth.OAuth2;
+@using Google.Apis.Services;
+@using Google.Apis.Upload;
+@using Google.Apis.Util.Store;
+@using Google.Apis.YouTube.v3;
+@using Google.Apis.YouTube.v3.Data;
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+
+<h3>SyncDWH</h3>
+
+<div class="iframe-container">
+    <div id="ytplayer">
+    </div>
+</div>
+
+<div class="form-group">
+    <label>
+        Video:
+        <input @bind="currentUrl" />
+    </label>
+    <button id="sendBtn" @onclick="Send" disabled="@(!IsConnected)">Send</button>
+</div>
+
+
+<div class="playlist">
+    <h2>Playlist:</h2>
+    <ol>
+        @foreach (var id in playlist)
+        {
+            if (currentId == id)
+            {
+                <li>
+                    <img src="@videoThumbs.GetValueOrDefault(id)" /> @videoTitles.GetValueOrDefault(id)
+                    <a @onclick="() => playlist.Remove(id)" href="">
+                        <svg class="bi bi-trash" width="1.25em" height="1.25em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                        </svg>
+                    </a>
+                </li>
+            }
+            else
+            {
+                <li>
+                    <a @onclick="() => SwitchVideo(id)" href=""><img src="@videoThumbs.GetValueOrDefault(id)" />@videoTitles.GetValueOrDefault(id)</a>
+                    <a @onclick="() => playlist.Remove(id)" href="">
+                        <svg class="bi bi-trash" width="1.25em" height="1.25em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
+                            <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
+                        </svg>
+                    </a>
+                </li>
+
+            }
+        }
+    </ol>
+</div>
+
+@code {
+    private string apikey;
+    private HubConnection hubConnection;
+    private int currentTimestamp;
+    private string currentUrl;
+    private string currentId;
+    private bool isPaused = true;
+    private int currentState;
+    private static Action action;
+    private IList<string> playlist = new List<string>();
+    private static readonly HttpClient client = new HttpClient() { BaseAddress = new Uri("https://localhost:44356/api/") };
+    private Dictionary<string, string> videoTitles = new Dictionary<string, string>();
+    private Dictionary<string, string> videoThumbs = new Dictionary<string, string>();
+
+
+    private enum playerStates
+    {
+        Unstarted = -1,
+        Ended = 0,
+        Playing = 1,
+        Paused = 2,
+        Buffering = 3,
+        VideoCued = 5
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        action = JsSync;
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri("/syncHub"))
+            .Build();
+
+
+
+        hubConnection.On<string>("ReceiveNewVideo", async (id) =>
+        {
+            Console.WriteLine("New video received: " + id + " Current ID: " + currentId);
+            if (string.IsNullOrEmpty(currentId))
+            {
+                currentId = id;
+                Console.WriteLine("Create player");
+                await JSRuntime.InvokeVoidAsync("onYouTubeIframeAPIReady", id);
+            }
+            else if (currentId != id)
+            {
+                currentId = id;
+                Console.WriteLine("Load new video");
+                await JSRuntime.InvokeVoidAsync("player.loadVideoById", id);
+            }
+            else
+            {
+                await JSRuntime.InvokeVoidAsync("seekTo", 0);
+            }
+            playlist.Add(id);
+            GetTitle(id);
+            GetThumbnailUrl(id);
+            StateHasChanged();
+
+        });
+
+
+        hubConnection.On<string, int>("ReceiveSync", async (id, timestamp) =>
+        {
+            if (currentId != id)
+            {
+                currentId = id;
+                Console.WriteLine("Load new video: " + currentId);
+                await JSRuntime.InvokeVoidAsync("player.loadVideoById", id);
+                Console.WriteLine("Seeking to " + timestamp.ToString());
+                await JSRuntime.InvokeVoidAsync("player.seekTo", timestamp);
+                currentTimestamp = timestamp;
+                Console.WriteLine("Announcing state change");
+                StateHasChanged();
+
+            }
+            Console.WriteLine("Received update " + id + " : " + currentTimestamp.ToString());
+            Console.WriteLine("Current ID: " + currentId);
+            this.currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
+            if (Math.Abs(currentTimestamp - timestamp) > 2)
+            {
+                if (currentTimestamp > timestamp)
+                {
+                    Console.WriteLine("Seeking backwards");
+                    Console.WriteLine("Seeking from " + currentTimestamp.ToString() + " to " + timestamp.ToString());
+                    await JSRuntime.InvokeVoidAsync("player.seekTo", timestamp);
+                    this.currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
+                    await JSRuntime.InvokeVoidAsync("player.playVideo");
+                    isPaused = false;
+                }
+                else
+                {
+                    Console.WriteLine("Seeking forward");
+                    Console.WriteLine("Seeking from " + currentTimestamp.ToString() + " to " + timestamp.ToString());
+                    await JSRuntime.InvokeVoidAsync("player.seekTo", timestamp);
+                    this.currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
+                    await JSRuntime.InvokeVoidAsync("player.playVideo");
+                    isPaused = false;
+                }
+            }
+        });
+
+        hubConnection.On<bool, int>("ReceivePauseStatus", async (pauseStatus, timestamp) =>
+        {
+            Console.WriteLine("Received Pause Status - isPaused: "
+                + pauseStatus.ToString()
+                + " Timestamp: " + timestamp.ToString()
+                + " CurrentState: " + currentState);
+            if (isPaused != pauseStatus)
+            {
+                currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
+                if (currentState == (int)playerStates.Paused || currentState == (int)playerStates.Unstarted || currentState == (int)playerStates.VideoCued)
+                {
+                    Console.WriteLine("Resuming video");
+                    await JSRuntime.InvokeVoidAsync("player.playVideo");
+                    currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
+                    isPaused = false;
+                }
+                else if (currentState == (int)playerStates.Playing)
+                {
+                    Console.WriteLine("Pausing video");
+                    await JSRuntime.InvokeVoidAsync("player.pauseVideo");
+                    await JSRuntime.InvokeVoidAsync("player.seekTo", timestamp);
+                    currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
+                    isPaused = true;
+                }
+            }
+        });
+        await hubConnection.StartAsync();
+    }
+
+    void StartUpdating()
+    {
+        var autoEvent = new AutoResetEvent(false);
+        var stateTimer = new Timer(CheckStatus,
+           autoEvent, 2000, 5000);
+    }
+
+    Task Send()
+    {
+
+        var newId = GetId(currentUrl);
+        Console.WriteLine("Sending " + newId);
+        return hubConnection.SendAsync("NewVideo", newId);
+    }
+
+    [JSInvokable("jsSync")]
+    public static void CallJsSync()
+    {
+        action.Invoke();
+    }
+
+    public async void JsSync()
+    {
+        currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
+        Console.WriteLine("Sending update - " + currentId + " : " + currentTimestamp.ToString());
+        await hubConnection.SendAsync("SyncVideo", currentId, currentTimestamp);
+
+        currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
+        isPaused = (int)playerStates.Paused == currentState;
+        Console.WriteLine("Sending update - isPaused: " + isPaused.ToString());
+        await hubConnection.SendAsync("PauseStatus", isPaused, currentTimestamp);
+    }
+
+    public async Task Update()
+    {
+        Console.WriteLine("Updating");
+        var newTime = await JSRuntime.InvokeAsync<int>("getTimestamp");
+        Console.WriteLine("new current timestamp: " + newTime.ToString());
+        this.currentTimestamp = newTime;
+        Console.WriteLine("current time: " + this.currentTimestamp.ToString());
+        await hubConnection.SendAsync("SyncVideo", currentId, this.currentTimestamp);
+        Console.WriteLine("Checking pause status");
+        currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
+        isPaused = (int)playerStates.Paused == currentState;
+        Console.WriteLine("Is paused: " + isPaused.ToString());
+        await hubConnection.SendAsync("PauseStatus", isPaused, this.currentTimestamp);
+    }
+
+    public async void CheckStatus(Object stateInfo)
+    {
+        AutoResetEvent autoEvent = (AutoResetEvent)stateInfo;
+        await Update();
+    }
+
+    public string GetId(string Url)
+    {
+        string id;
+        if (Url.Contains("?v="))
+        {
+            id = Url.Split("=")[1];
+
+        }
+        else
+        {
+            id = Url.Split("/")[1];
+        }
+        return id;
+
+    }
+
+    public async void SwitchVideo(string id)
+    {
+        Console.WriteLine("testing switching video");
+        await hubConnection.SendAsync("SyncVideo", id, 0);
+        StateHasChanged();
+    }
+
+    public bool IsConnected =>
+        hubConnection.State == HubConnectionState.Connected;
+
+    public void Dispose()
+    {
+        _ = hubConnection.DisposeAsync();
+    }
+
+    public async void GetTitle(string videoId)
+    {
+        HttpResponseMessage response = await client.GetAsync("youtube/GetTitle/" + videoId);
+        var responseBody = await response.Content.ReadAsStringAsync();
+        videoTitles.Add(videoId, responseBody);
+        StateHasChanged();
+    }
+
+    public async void GetThumbnailUrl(string videoId)
+    {
+        HttpResponseMessage response = await client.GetAsync("youtube/GetThumbnails/" + videoId);
+        var responseBody = await response.Content.ReadAsStringAsync();
+        videoThumbs.Add(videoId, responseBody);
+        StateHasChanged();
+    }
+
+}
