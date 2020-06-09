@@ -64,8 +64,8 @@
 </div>
 
 @code {
-    private string apikey;
     private HubConnection hubConnection;
+    private bool updating = false;
     private int currentTimestamp;
     private string currentUrl;
     private string currentId;
@@ -108,28 +108,39 @@
                 Console.WriteLine("Create player");
                 playlist = playlist.Append(id).ToList();
                 await JSRuntime.InvokeVoidAsync("onYouTubeIframeAPIReady", id);
+                GetTitle(id);
+                GetThumbnailUrl(id);
+                StateHasChanged();
             }
             else if (currentId != id)
             {
                 Console.WriteLine("Adding video to playlist with ID: " + id);
                 playlist = playlist.Append(id).ToList();
                 var currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
-                if (currentState == (int)playerStates.Ended) 
+                if (currentState == (int)playerStates.Ended)
                 {
                     Console.WriteLine("Playlist is done playing, moving to the newly added video.");
                     JsNextVideo();
                 }
+                GetTitle(id);
+                GetThumbnailUrl(id);
+                StateHasChanged();
             }
-
-            GetTitle(id);
-            GetThumbnailUrl(id);
-            StateHasChanged();
-
         });
 
 
         hubConnection.On<string, int>("ReceiveSync", async (id, timestamp) =>
         {
+            if (!updating)
+            {
+                StartUpdating();
+                updating = true;
+            }
+            if (playlist.Count < 1)
+            {
+                Console.WriteLine("Requesting playlists to be synced");
+                await hubConnection.SendAsync("PlaylistRequest", true);
+            }
             if (string.IsNullOrEmpty(currentId))
             {
                 await hubConnection.SendAsync("NewVideo", id);
@@ -199,6 +210,40 @@
                 }
             }
         });
+
+        hubConnection.On<List<string>>("ReceivePlaylist", (playlist) =>
+        {
+            Console.WriteLine("Receiving playlist data: " + string.Join(", ", playlist));
+            if (!this.playlist.SequenceEqual(playlist))
+            {
+                this.playlist = playlist;
+                foreach (var id in playlist)
+                {
+                    try
+                    {
+                        Console.WriteLine("Adding video title and thumbnail for ID: " + id);
+                        GetTitle(id);
+                        GetThumbnailUrl(id);
+                    }
+                    catch (System.ArgumentException)
+                    {
+                        Console.WriteLine("Title/Thumbnail were already in their respective lists");
+                    }
+
+                }
+            }
+        });
+
+        hubConnection.On<bool>("PlaylistRequest", async (_) =>
+        {
+            Console.WriteLine("Another Client Requested Playlist Sync");
+            if (playlist.Count > 0)
+            {
+                Console.WriteLine("Sending playlist");
+                await hubConnection.SendAsync("SendPlaylist", playlist);
+            }
+        });
+
         await hubConnection.StartAsync();
     }
 
@@ -206,14 +251,18 @@
     {
         var autoEvent = new AutoResetEvent(false);
         var stateTimer = new Timer(CheckStatus,
-           autoEvent, 2000, 5000);
+           autoEvent, 10000, 10000);
     }
 
     Task Send()
     {
-
         var newId = GetId(currentUrl);
         Console.WriteLine("Sending " + newId);
+        if (!updating)
+        {
+            StartUpdating();
+            updating = true;
+        }
         return hubConnection.SendAsync("NewVideo", newId);
     }
 
@@ -226,12 +275,12 @@
     public async void JsSync()
     {
         currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
-        Console.WriteLine("Sending update - " + currentId + " : " + currentTimestamp.ToString());
+        Console.WriteLine("Sending SyncVideo - " + currentId + " : " + currentTimestamp.ToString());
         await hubConnection.SendAsync("SyncVideo", currentId, currentTimestamp);
 
         currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
         isPaused = (int)playerStates.Paused == currentState;
-        Console.WriteLine("Sending update - isPaused: " + isPaused.ToString());
+        Console.WriteLine("Sending PauseStatus - isPaused: " + isPaused.ToString());
         await hubConnection.SendAsync("PauseStatus", isPaused, currentTimestamp);
     }
 
@@ -291,6 +340,8 @@
     {
         Console.WriteLine("Switching video to ID: " + id);
         await hubConnection.SendAsync("SyncVideo", id, 0);
+        await JSRuntime.InvokeVoidAsync("player.loadVideoById", id);
+        currentId = id;
         StateHasChanged();
     }
 
@@ -306,16 +357,32 @@
     {
         HttpResponseMessage response = await client.GetAsync("youtube/GetTitle/" + videoId);
         var responseBody = await response.Content.ReadAsStringAsync();
-        videoTitles.Add(videoId, responseBody);
-        StateHasChanged();
+        try
+        {
+            videoTitles.Add(videoId, responseBody);
+            StateHasChanged();
+        }
+        catch (System.ArgumentException)
+        {
+            Console.WriteLine("Video title is already in videoTitles");
+        }
+
     }
 
     public async void GetThumbnailUrl(string videoId)
     {
         HttpResponseMessage response = await client.GetAsync("youtube/GetThumbnails/" + videoId);
         var responseBody = await response.Content.ReadAsStringAsync();
-        videoThumbs.Add(videoId, responseBody);
-        StateHasChanged();
+        try
+        {
+            videoThumbs.Add(videoId, responseBody);
+            StateHasChanged();
+        }
+        catch (System.ArgumentException)
+        {
+            Console.WriteLine("Video thumbnail is already in videoThumbs");
+        }
+
     }
 
 }

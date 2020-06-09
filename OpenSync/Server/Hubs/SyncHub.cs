@@ -10,7 +10,7 @@ namespace OpenSync.Server.Hubs
     {
         public async Task SyncVideo(string id, int timestamp)
         {
-            await Clients.All.SendAsync("ReceiveSync", id, timestamp);
+            await Clients.Others.SendAsync("ReceiveSync", id, timestamp);
         }
 
         public async Task NewVideo(string id)
@@ -20,7 +20,17 @@ namespace OpenSync.Server.Hubs
 
         public async Task PauseStatus(bool isPaused, int timestamp)
         {
-            await Clients.All.SendAsync("ReceivePauseStatus", isPaused, timestamp);
+            await Clients.Others.SendAsync("ReceivePauseStatus", isPaused, timestamp);
+        }
+
+        public async Task SendPlaylist(List<string> playlist)
+        {
+            await Clients.Others.SendAsync("ReceivePlaylist", playlist);
+        }
+
+        public async Task PlaylistRequest(bool _)
+        {
+            await Clients.Others.SendAsync("PlaylistRequest", true);
         }
     }
 }
