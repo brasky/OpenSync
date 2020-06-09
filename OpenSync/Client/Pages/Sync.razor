@@ -13,7 +13,7 @@
 @implements IDisposable
 
 
-<h3>SyncDWH</h3>
+<h3>OpenSync</h3>
 
 <div class="iframe-container">
     <div id="ytplayer">
@@ -71,7 +71,8 @@
     private string currentId;
     private bool isPaused = true;
     private int currentState;
-    private static Action action;
+    private static Action jsSync;
+    private static Action jsNextVideo;
     private IList<string> playlist = new List<string>();
     private static readonly HttpClient client = new HttpClient() { BaseAddress = new Uri("https://localhost:44356/api/") };
     private Dictionary<string, string> videoTitles = new Dictionary<string, string>();
@@ -90,7 +91,8 @@
 
     protected override async Task OnInitializedAsync()
     {
-        action = JsSync;
+        jsSync = JsSync;
+        jsNextVideo = JsNextVideo;
         hubConnection = new HubConnectionBuilder()
             .WithUrl(NavigationManager.ToAbsoluteUri("/syncHub"))
             .Build();
@@ -111,6 +113,12 @@
             {
                 Console.WriteLine("Adding video to playlist with ID: " + id);
                 playlist = playlist.Append(id).ToList();
+                var currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
+                if (currentState == (int)playerStates.Ended) 
+                {
+                    Console.WriteLine("Playlist is done playing, moving to the newly added video.");
+                    JsNextVideo();
+                }
             }
 
             GetTitle(id);
@@ -122,6 +130,11 @@
 
         hubConnection.On<string, int>("ReceiveSync", async (id, timestamp) =>
         {
+            if (string.IsNullOrEmpty(currentId))
+            {
+                await hubConnection.SendAsync("NewVideo", id);
+                return;
+            }
             if (currentId != id)
             {
                 currentId = id;
@@ -207,7 +220,7 @@
     [JSInvokable("jsSync")]
     public static void CallJsSync()
     {
-        action.Invoke();
+        jsSync.Invoke();
     }
 
     public async void JsSync()
@@ -220,6 +233,21 @@
         isPaused = (int)playerStates.Paused == currentState;
         Console.WriteLine("Sending update - isPaused: " + isPaused.ToString());
         await hubConnection.SendAsync("PauseStatus", isPaused, currentTimestamp);
+    }
+
+    [JSInvokable("jsNextVideo")]
+    public static void CallJsNextVideo()
+    {
+        jsNextVideo.Invoke();
+    }
+
+    public void JsNextVideo()
+    {
+        var index = playlist.IndexOf(currentId);
+        if (index < playlist.Count-1)
+        {
+            SwitchVideo(playlist[index + 1]);
+        }
     }
 
     public async Task Update()
@@ -261,7 +289,7 @@
 
     public async void SwitchVideo(string id)
     {
-        Console.WriteLine("testing switching video");
+        Console.WriteLine("Switching video to ID: " + id);
         await hubConnection.SendAsync("SyncVideo", id, 0);
         StateHasChanged();
     }
