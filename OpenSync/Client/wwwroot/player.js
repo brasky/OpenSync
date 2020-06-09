@@ -25,10 +25,12 @@ function onPlayerStateChange(event) {
     var duration = getDuration();
     var currentState = player.getPlayerState()
     //-1 is "Unstarted" but there is no YT.PlayerState constant for Unstarted.
-    if (currentTimestamp == duration && currentState != -1 && currentState != YT.PlayerState.BUFFERING) {
+    if (currentTimestamp == duration && duration > 0 && currentState != -1 && currentState != undefined) {
+        console.log("player.js - Calling jsNextVideo");
         DotNet.invokeMethodAsync('OpenSync.Client', 'jsNextVideo');
     }
-    else {
+    else if (currentState == YT.PlayerState.PLAYING || currentState == YT.PlayerState.PAUSED) {
+        console.log("player.js - Calling jsSync");
         DotNet.invokeMethodAsync('OpenSync.Client', 'jsSync');
     }       
 }

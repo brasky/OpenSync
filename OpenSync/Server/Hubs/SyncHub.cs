@@ -8,9 +8,9 @@ namespace OpenSync.Server.Hubs
 {
     public class SyncHub : Hub
     {
-        public async Task SyncVideo(string id, int timestamp)
+        public async Task SyncVideo(string id, int timestamp, int playlistSize)
         {
-            await Clients.Others.SendAsync("ReceiveSync", id, timestamp);
+            await Clients.Others.SendAsync("ReceiveSync", id, timestamp, playlistSize);
         }
 
         public async Task NewVideo(string id)
