@@ -8,6 +8,8 @@
 @using Google.Apis.Util.Store;
 @using Google.Apis.YouTube.v3;
 @using Google.Apis.YouTube.v3.Data;
+@using System.Net.Http;
+@inject HttpClient Http; 
 @inject NavigationManager NavigationManager
 @inject IJSRuntime JSRuntime
 @implements IDisposable
@@ -355,7 +357,7 @@
 
     public async void GetTitle(string videoId)
     {
-        HttpResponseMessage response = await client.GetAsync("youtube/GetTitle/" + videoId);
+        HttpResponseMessage response = await Http.GetAsync("api/youtube/GetTitle/" + videoId);
         var responseBody = await response.Content.ReadAsStringAsync();
         try
         {
@@ -371,7 +373,8 @@
 
     public async void GetThumbnailUrl(string videoId)
     {
-        HttpResponseMessage response = await client.GetAsync("youtube/GetThumbnails/" + videoId);
+
+        HttpResponseMessage response = await Http.GetAsync("api/youtube/GetThumbnails/" + videoId);
         var responseBody = await response.Content.ReadAsStringAsync();
         try
         {
