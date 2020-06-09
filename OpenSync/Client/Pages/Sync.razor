@@ -104,19 +104,15 @@
             {
                 currentId = id;
                 Console.WriteLine("Create player");
+                playlist = playlist.Append(id).ToList();
                 await JSRuntime.InvokeVoidAsync("onYouTubeIframeAPIReady", id);
             }
             else if (currentId != id)
             {
-                currentId = id;
-                Console.WriteLine("Load new video");
-                await JSRuntime.InvokeVoidAsync("player.loadVideoById", id);
+                Console.WriteLine("Adding video to playlist with ID: " + id);
+                playlist = playlist.Append(id).ToList();
             }
-            else
-            {
-                await JSRuntime.InvokeVoidAsync("seekTo", 0);
-            }
-            playlist.Add(id);
+
             GetTitle(id);
             GetThumbnailUrl(id);
             StateHasChanged();
