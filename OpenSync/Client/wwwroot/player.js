@@ -14,11 +14,6 @@ function onYouTubeIframeAPIReady(id) {
             });
       }
 
-function onPlayerReady(event) {
-    console.log("play video");
-                event.target.playVideo();
-}
-
 function onPlayerStateChange(event) {
     console.log("State Change - New Player State: " + currentState);
     var currentTimestamp = getTimestamp();
