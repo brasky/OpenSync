@@ -294,6 +294,8 @@
     Task Send()
     {
         var newId = GetId(currentUrl);
+        currentUrl = string.Empty;
+        StateHasChanged();
         Console.WriteLine("Sending " + newId);
         if (!updating)
         {
