@@ -4,14 +4,22 @@ tag.src = "https://www.youtube.com/iframe_api";
 var firstScriptTag = document.getElementsByTagName('script')[0];
 firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
 var player;
+var startingTimestamp;
 function onYouTubeIframeAPIReady(id, timestamp) {
     console.log("Making player");
     player = new YT.Player('ytplayer', {
         videoId: id,
         events: {
-            'onStateChange': onPlayerStateChange
+            'onStateChange': onPlayerStateChange,
+            'onReady': intializeTimestamp
         }
     });
+    if (timestamp > 0) startingTimestamp = timestamp;
+}
+
+function intializeTimestamp() {
+    if (startingTimestamp > 0) player.seekTo(startingTimestamp);
+    startingTimestamp = -1;
 }
 
 function onPlayerStateChange(event) {

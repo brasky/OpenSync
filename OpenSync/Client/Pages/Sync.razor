@@ -101,15 +101,15 @@
 
 
 
-        hubConnection.On<string>("ReceiveNewVideo", async (id) =>
+        hubConnection.On<string, int>("ReceiveNewVideo", async (id, timestamp) =>
         {
-            Console.WriteLine("New video received: " + id + " Current ID: " + currentId);
+            Console.WriteLine("New video received: " + id + " Current ID: " + currentId + " Timestamp: " + timestamp);
             if (string.IsNullOrEmpty(currentId))
             {
                 currentId = id;
                 Console.WriteLine("Create player");
                 playlist = playlist.Append(id).ToList();
-                await JSRuntime.InvokeVoidAsync("onYouTubeIframeAPIReady", id, 0);
+                await JSRuntime.InvokeVoidAsync("onYouTubeIframeAPIReady", id, timestamp);
                 GetTitle(id);
                 GetThumbnailUrl(id);
                 StateHasChanged();
@@ -293,7 +293,15 @@
 
     Task Send()
     {
+        int timestamp = 0;
+        if (ContainsTimestamp(currentUrl))
+        {
+            Console.WriteLine("has timestamp");
+            timestamp = GetUrlTimestamp(currentUrl);
+            Console.WriteLine(timestamp.ToString());
+        }
         var newId = GetId(currentUrl);
+        Console.WriteLine("new id " + newId);
         currentUrl = string.Empty;
         StateHasChanged();
         Console.WriteLine("Sending " + newId);
@@ -302,7 +310,7 @@
             StartUpdating();
             updating = true;
         }
-        return hubConnection.SendAsync("NewVideo", newId);
+        return hubConnection.SendAsync("NewVideo", newId, timestamp);
     }
 
     [JSInvokable("jsSync")]
@@ -343,16 +351,31 @@
         string id;
         if (Url.Contains("?v="))
         {
-            id = Url.Split("=")[1];
-
+            id = Url.Split("=")[1].Split("&t")[0];
+            Console.WriteLine("if: " + id);
         }
         else
         {
-            id = Url.Split("/")[1];
+            id = Url.Replace("https://", "").Split("/")[1].Split("&t=")[0];
+            Console.WriteLine("else: " + id);
         }
         return id;
-
     }
+
+    public int GetUrlTimestamp(string Url)
+    {
+        return int.Parse(Url.Split("=")[2].TrimEnd('s'));
+    }
+
+    public bool ContainsTimestamp(string Url)
+    {
+        if (Url.Contains("&t="))
+        {
+            return true;
+        }
+        return false;
+    }
+
 
     public async void DeleteVideo(string id)
     {

@@ -13,9 +13,9 @@ namespace OpenSync.Server.Hubs
             await Clients.Others.SendAsync("ReceiveSync", id, timestamp, playlistSize);
         }
 
-        public async Task NewVideo(string id)
+        public async Task NewVideo(string id, int timestamp)
         {
-            await Clients.All.SendAsync("ReceiveNewVideo", id);
+            await Clients.All.SendAsync("ReceiveNewVideo", id, timestamp);
         }
 
         public async Task PauseStatus(bool isPaused, int timestamp)
