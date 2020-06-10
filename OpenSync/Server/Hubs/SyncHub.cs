@@ -23,9 +23,9 @@ namespace OpenSync.Server.Hubs
             await Clients.Others.SendAsync("ReceivePauseStatus", isPaused, timestamp);
         }
 
-        public async Task SendPlaylist(List<string> playlist)
+        public async Task SendPlaylist(List<string> playlist, string id, int timestamp)
         {
-            await Clients.Others.SendAsync("ReceivePlaylist", playlist);
+            await Clients.Others.SendAsync("ReceivePlaylist", playlist, id, timestamp);
         }
 
         public async Task PlaylistRequest(bool _)

@@ -109,7 +109,7 @@
                 currentId = id;
                 Console.WriteLine("Create player");
                 playlist = playlist.Append(id).ToList();
-                await JSRuntime.InvokeVoidAsync("onYouTubeIframeAPIReady", id);
+                await JSRuntime.InvokeVoidAsync("onYouTubeIframeAPIReady", id, 0);
                 GetTitle(id);
                 GetThumbnailUrl(id);
                 StateHasChanged();
@@ -163,7 +163,7 @@
             Console.WriteLine("Received update " + id + " : " + currentTimestamp.ToString());
             Console.WriteLine("Current ID: " + currentId);
             this.currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
-            if (currentTimestamp > timestamp && currentTimestamp - timestamp > 2)
+            if (currentTimestamp < timestamp && Math.Abs(currentTimestamp - timestamp) > 2)
             {
                 Console.WriteLine("Seeking forward from " + currentTimestamp.ToString() + " to " + timestamp.ToString());
                 await JSRuntime.InvokeVoidAsync("player.seekTo", timestamp);
@@ -198,7 +198,7 @@
             }
         });
 
-        hubConnection.On<List<string>>("ReceivePlaylist", (playlist) =>
+        hubConnection.On<List<string>, string, int>("ReceivePlaylist", async (playlist, videoId, timestamp) =>
         {
             Console.WriteLine("Receiving playlist data: " + string.Join(", ", playlist));
             if (!this.playlist.SequenceEqual(playlist))
@@ -218,7 +218,12 @@
                     }
 
                 }
+                currentId = videoId;
+                currentTimestamp = timestamp;
                 StateHasChanged();
+                Console.WriteLine("Received playlist, loading video " + videoId);
+                await JSRuntime.InvokeVoidAsync("player.onYouTubeIframeAPIReady", videoId, timestamp);
+
             }
         });
 
@@ -228,7 +233,8 @@
             if (playlist.Count > 0)
             {
                 Console.WriteLine("Sending playlist");
-                await hubConnection.SendAsync("SendPlaylist", playlist);
+                currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
+                await hubConnection.SendAsync("SendPlaylist", playlist, currentId, currentTimestamp);
             }
         });
 
@@ -348,8 +354,15 @@
 
     public async void DeleteVideo(string id)
     {
+
+        var index = playlist.IndexOf(id);
+        if (index < playlist.Count - 1 && id == currentId)
+        {
+            currentId = playlist[index + 1];
+            SwitchVideo(currentId);
+        }
         playlist.Remove(id);
-        await hubConnection.SendAsync("SendPlaylist", playlist);
+        await hubConnection.SendAsync("SendPlaylist", playlist, currentId, currentTimestamp);
         StateHasChanged();
     }
 
