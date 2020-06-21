@@ -16,6 +16,8 @@
 
 
 <h3>OpenSync</h3>
+<h4>Your ID: @hubConnection.ConnectionId</h4>
+<h4>Leader: @Leader</h4>
 
 <div class="iframe-container">
     <div id="ytplayer">
@@ -79,6 +81,7 @@
     private static readonly HttpClient client = new HttpClient() { BaseAddress = new Uri("https://localhost:44356/api/") };
     private Dictionary<string, string> videoTitles = new Dictionary<string, string>();
     private Dictionary<string, string> videoThumbs = new Dictionary<string, string>();
+    public string Leader = string.Empty;
 
 
     private enum playerStates
@@ -133,19 +136,14 @@
 
         hubConnection.On<string, int, int>("ReceiveSync", async (id, timestamp, playlistSize) =>
         {
-            Console.WriteLine("Received update " + id + " : " + currentTimestamp.ToString());
-            Console.WriteLine("Current ID: " + currentId);
-            if (!updating)
-            {
-                StartUpdating();
-                updating = true;
-            }
+            Console.WriteLine("Received update " + id + " : " + timestamp.ToString());
+            Console.WriteLine("Current ID: " + currentId + " Current Timestamp: " + currentTimestamp.ToString());
             if (playlist.Count != playlistSize)
             {
                 Console.WriteLine("Requesting playlists to be synced");
-                await hubConnection.SendAsync("PlaylistRequest", true);
+                await hubConnection.SendAsync("PlaylistRequest");
             }
-            if (currentId != id && !string.IsNullOrEmpty(currentId))
+            if (currentId != id)
             {
                 currentId = id;
                 Console.WriteLine("Load new video: " + currentId);
@@ -158,9 +156,9 @@
 
             }
             this.currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
-            if (currentTimestamp < timestamp && Math.Abs(currentTimestamp - timestamp) > 2)
+            if (Math.Abs(currentTimestamp - timestamp) > 2)
             {
-                Console.WriteLine("Seeking forward from " + currentTimestamp.ToString() + " to " + timestamp.ToString());
+                Console.WriteLine("Seeking from " + currentTimestamp.ToString() + " to " + timestamp.ToString());
                 await JSRuntime.InvokeVoidAsync("player.seekTo", timestamp);
                 this.currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
             }
@@ -168,21 +166,23 @@
 
         hubConnection.On<bool, int>("ReceivePauseStatus", async (pauseStatus, timestamp) =>
         {
+            isPaused = (int)playerStates.Paused == currentState;
             Console.WriteLine("Received Pause Status - isPaused: "
                 + pauseStatus.ToString()
                 + " Timestamp: " + timestamp.ToString()
-                + " CurrentState: " + currentState);
+                + " CurrentState: " + currentState
+                + " isPaused: " + isPaused);
             if (isPaused != pauseStatus)
             {
                 currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
-                if (currentState == (int)playerStates.Paused || currentState == (int)playerStates.Unstarted || currentState == (int)playerStates.VideoCued)
+                if (currentState != (int)playerStates.Playing)
                 {
                     Console.WriteLine("Resuming video");
                     await JSRuntime.InvokeVoidAsync("player.playVideo");
                     currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
                     isPaused = false;
                 }
-                else if (currentState == (int)playerStates.Playing)
+                else
                 {
                     Console.WriteLine("Pausing video");
                     await JSRuntime.InvokeVoidAsync("player.pauseVideo");
@@ -223,7 +223,7 @@
             }
         });
 
-        hubConnection.On<bool>("PlaylistRequest", async (_) =>
+        hubConnection.On("PlaylistRequest", async () =>
         {
             Console.WriteLine("Another Client Requested Playlist Sync");
             if (playlist.Count > 0)
@@ -234,6 +234,16 @@
             }
         });
 
+        hubConnection.On<string>("Leader", (connectionId) =>
+        {
+            Leader = connectionId;
+            if (hubConnection.ConnectionId.Equals(Leader) && !updating)
+            {
+                StartUpdating();
+            }
+            StateHasChanged();
+        });
+
         await hubConnection.StartAsync();
     }
 
@@ -241,7 +251,7 @@
     {
         var autoEvent = new AutoResetEvent(false);
         var stateTimer = new Timer(CheckStatus,
-           autoEvent, 10000, 3000);
+           autoEvent, 3000, 2000);
     }
 
     public async void CheckStatus(Object stateInfo)
@@ -255,11 +265,9 @@
         Console.WriteLine("---Regular Update---");
         try
         {
-            var newTime = await JSRuntime.InvokeAsync<int>("getTimestamp");
-            Console.WriteLine("new current timestamp: " + newTime.ToString());
-            this.currentTimestamp = newTime;
-            Console.WriteLine("current time: " + this.currentTimestamp.ToString());
-            await hubConnection.SendAsync("SyncVideo", currentId, this.currentTimestamp, playlist.Count);
+            currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
+            Console.WriteLine("current time: " + currentTimestamp.ToString());
+            await hubConnection.SendAsync("SyncVideo", currentId, currentTimestamp, playlist.Count);
         }
         catch (JSException)
         {
@@ -288,7 +296,7 @@
         Console.WriteLine("---End Update---");
     }
 
-    Task Send()
+    async Task Send()
     {
         int timestamp = 0;
         if (ContainsTimestamp(currentUrl))
@@ -302,12 +310,13 @@
         currentUrl = string.Empty;
         StateHasChanged();
         Console.WriteLine("Sending " + newId);
-        if (!updating)
+        if (!updating && hubConnection.ConnectionId.Equals(Leader))
         {
+            Console.WriteLine("We are the leader, starting to update");
             StartUpdating();
             updating = true;
         }
-        return hubConnection.SendAsync("NewVideo", newId, timestamp);
+        await hubConnection.SendAsync("NewVideo", newId, timestamp);
     }
 
     [JSInvokable("jsSync")]
@@ -318,40 +327,30 @@
 
     public async void JsSync()
     {
-        Console.WriteLine("---JsSync---");
-        try
+        currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
+        Console.WriteLine("new current timestamp: " + currentTimestamp.ToString());
+        currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
+        if (currentState != (int)playerStates.Unstarted && currentState != (int)playerStates.VideoCued)
         {
-            var newTime = await JSRuntime.InvokeAsync<int>("getTimestamp");
-            Console.WriteLine("new current timestamp: " + newTime.ToString());
-            this.currentTimestamp = newTime;
-            Console.WriteLine("current time: " + this.currentTimestamp.ToString());
-            await hubConnection.SendAsync("SyncVideo", currentId, this.currentTimestamp, playlist.Count);
+            isPaused = (int)playerStates.Paused == currentState;
         }
-        catch (JSException)
+        else
         {
-            Console.WriteLine("Could not fetch timestamp");
+            isPaused = true;
         }
 
-        Console.WriteLine("Checking pause status");
-        try
+        if (!hubConnection.ConnectionId.Equals(Leader))
         {
-            currentState = await JSRuntime.InvokeAsync<int>("player.getPlayerState");
-            if (currentState != (int)playerStates.Unstarted && currentState != (int)playerStates.VideoCued)
-            {
-                isPaused = (int)playerStates.Paused == currentState;
-            }
-            else
-            {
-                isPaused = true;
-            }
-            Console.WriteLine("Is paused: " + isPaused.ToString() + " currentState: " + currentState);
-            await hubConnection.SendAsync("PauseStatus", isPaused, this.currentTimestamp);
+            return;
         }
-        catch (JSException)
+
+        if (!updating)
         {
-            Console.WriteLine("Could not get current state");
+            StartUpdating();
+            updating = true;
         }
-        Console.WriteLine("---End JsSync---");
+        await hubConnection.SendAsync("SyncVideo", currentId, this.currentTimestamp, playlist.Count);
+        await hubConnection.SendAsync("PauseStatus", isPaused, this.currentTimestamp);
     }
 
     [JSInvokable("jsNextVideo")]
@@ -463,5 +462,5 @@
         }
 
     }
-
 }
+
