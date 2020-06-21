@@ -74,7 +74,12 @@ namespace OpenSync.Server.Hubs
                 UserHandler.Leader = Context.ConnectionId;
             }
 
-                await Clients.All.SendAsync("Leader", UserHandler.Leader);
+            if (!UserHandler.ConnectedIds.Any())
+            {
+                UserHandler.Leader = string.Empty;
+            }
+            
+            await Clients.All.SendAsync("Leader", UserHandler.Leader);
             
         }
     }
