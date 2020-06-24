@@ -15,14 +15,14 @@ namespace OpenSync.Server.Hubs
 
     public class SyncHub : Hub
     {
-        public override Task OnConnectedAsync()
+        public async override Task OnConnectedAsync()
         {
             UserHandler.ConnectedIds.Add(Context.ConnectionId);
-            GetLeader();
-            return base.OnConnectedAsync();
+            await GetLeader();
+            await base.OnConnectedAsync();
         }
 
-        public override Task OnDisconnectedAsync(Exception exception)
+        public async override Task OnDisconnectedAsync(Exception exception)
         {
             UserHandler.ConnectedIds.Remove(Context.ConnectionId);
             if (UserHandler.Leader == Context.ConnectionId)
@@ -36,8 +36,8 @@ namespace OpenSync.Server.Hubs
                     UserHandler.Leader = string.Empty;
                 }
             }
-            GetLeader();
-            return base.OnDisconnectedAsync(exception);
+            await GetLeader();
+            await base.OnDisconnectedAsync(exception);
         }
 
         public async Task SyncVideo(string id, int timestamp, int playlistSize)
