@@ -1,0 +1,23 @@
+﻿@page "/"
+@inject NavigationManager Navigation
+
+<h3>OpenSync</h3>
+
+<form action="">
+    <label>
+        Create/Join a Room:
+        <input type="text" name="name" @bind="roomName" required pattern="[A-Za-z0-9]{1,20}" />
+    </label>
+    <button type="submit" id="roomBtn" @onclick="GoToRoom">Submit</button>
+</form>
+
+@code {
+
+    private string roomName;
+
+    public void GoToRoom()
+    {
+        if (!string.IsNullOrEmpty(roomName)) Navigation.NavigateTo($"room/{roomName}");
+    }
+
+}

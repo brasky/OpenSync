@@ -1,7 +1,8 @@
-﻿@page "/"
+﻿@page "/room/{roomName}"
 
 @using Microsoft.AspNetCore.SignalR.Client
 @using System.Threading;
+@using OpenSync.Shared.Models;
 @using Google.Apis.Auth.OAuth2;
 @using Google.Apis.Services;
 @using Google.Apis.Upload;
@@ -15,7 +16,7 @@
 @implements IDisposable
 
 
-<h3>OpenSync</h3>
+<h3><a href="">OpenSync</a></h3>
 <h4>Your ID: @hubConnection.ConnectionId</h4>
 <h4>Leader: @Leader</h4>
 
@@ -42,7 +43,7 @@
             {
                 <li>
                     <img src="@videoThumbs.GetValueOrDefault(id)" /> @videoTitles.GetValueOrDefault(id)
-                    <a @onclick="() => DeleteVideo(id)" href="">
+                    <a @onclick="() => DeleteVideo(id)" href="javascript:void(0);">
                         <svg class="bi bi-trash" width="1.25em" height="1.25em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                             <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
                             <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
@@ -53,8 +54,8 @@
             else
             {
                 <li>
-                    <a @onclick="() => SwitchVideo(id)" href=""><img src="@videoThumbs.GetValueOrDefault(id)" />@videoTitles.GetValueOrDefault(id)</a>
-                    <a @onclick="() => DeleteVideo(id)" href="">
+                    <a @onclick="() => SwitchVideo(id)" href="javascript:void(0);"><img src="@videoThumbs.GetValueOrDefault(id)" />@videoTitles.GetValueOrDefault(id)</a>
+                    <a @onclick="() => DeleteVideo(id)" href="javascript:void(0);">
                         <svg class="bi bi-trash" width="1.25em" height="1.25em" viewBox="0 0 16 16" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
                             <path d="M5.5 5.5A.5.5 0 0 1 6 6v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm2.5 0a.5.5 0 0 1 .5.5v6a.5.5 0 0 1-1 0V6a.5.5 0 0 1 .5-.5zm3 .5a.5.5 0 0 0-1 0v6a.5.5 0 0 0 1 0V6z" />
                             <path fill-rule="evenodd" d="M14.5 3a1 1 0 0 1-1 1H13v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4h-.5a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1H6a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1h3.5a1 1 0 0 1 1 1v1zM4.118 4L4 4.059V13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1V4.059L11.882 4H4.118zM2.5 3V2h11v1h-11z" />
@@ -68,6 +69,9 @@
 </div>
 
 @code {
+    [Parameter]
+    public string roomName { get; set; }
+
     private HubConnection hubConnection;
     private bool updating = false;
     private int currentTimestamp;
@@ -99,7 +103,7 @@
         jsSync = JsSync;
         jsNextVideo = JsNextVideo;
         hubConnection = new HubConnectionBuilder()
-            .WithUrl(NavigationManager.ToAbsoluteUri("/syncHub"))
+            .WithUrl(NavigationManager.ToAbsoluteUri($"/syncHub?room={roomName}"))
             .Build();
 
 
@@ -141,7 +145,7 @@
             if (playlist.Count != playlistSize)
             {
                 Console.WriteLine("Requesting playlists to be synced");
-                await hubConnection.SendAsync("PlaylistRequest");
+                await hubConnection.SendAsync("PlaylistRequest", roomName);
             }
             if (currentId != id)
             {
@@ -230,7 +234,7 @@
             {
                 Console.WriteLine("Sending playlist");
                 currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
-                await hubConnection.SendAsync("SendPlaylist", playlist, currentId, currentTimestamp);
+                await hubConnection.SendAsync("SendPlaylist", roomName, playlist, currentId, currentTimestamp);
             }
         });
 
@@ -243,7 +247,6 @@
             }
             StateHasChanged();
         });
-
         await hubConnection.StartAsync();
     }
 
@@ -267,7 +270,7 @@
         {
             currentTimestamp = await JSRuntime.InvokeAsync<int>("getTimestamp");
             Console.WriteLine("current time: " + currentTimestamp.ToString());
-            await hubConnection.SendAsync("SyncVideo", currentId, currentTimestamp, playlist.Count);
+            await hubConnection.SendAsync("SyncVideo", roomName, currentId, currentTimestamp, playlist.Count);
         }
         catch (JSException)
         {
@@ -287,7 +290,7 @@
                 isPaused = true;
             }
             Console.WriteLine("Is paused: " + isPaused.ToString());
-            await hubConnection.SendAsync("PauseStatus", isPaused, this.currentTimestamp);
+            await hubConnection.SendAsync("PauseStatus", roomName, isPaused, this.currentTimestamp);
         }
         catch (JSException)
         {
@@ -316,7 +319,7 @@
             StartUpdating();
             updating = true;
         }
-        await hubConnection.SendAsync("NewVideo", newId, timestamp);
+        await hubConnection.SendAsync("NewVideo", roomName, newId, timestamp);
     }
 
     [JSInvokable("jsSync")]
@@ -349,8 +352,8 @@
             StartUpdating();
             updating = true;
         }
-        await hubConnection.SendAsync("SyncVideo", currentId, this.currentTimestamp, playlist.Count);
-        await hubConnection.SendAsync("PauseStatus", isPaused, this.currentTimestamp);
+        await hubConnection.SendAsync("SyncVideo", roomName, currentId, this.currentTimestamp, playlist.Count);
+        await hubConnection.SendAsync("PauseStatus", roomName, isPaused, this.currentTimestamp);
     }
 
     [JSInvokable("jsNextVideo")]
@@ -409,14 +412,14 @@
             SwitchVideo(currentId);
         }
         playlist.Remove(id);
-        await hubConnection.SendAsync("SendPlaylist", playlist, currentId, currentTimestamp);
+        await hubConnection.SendAsync("SendPlaylist", roomName, playlist, currentId, currentTimestamp);
         StateHasChanged();
     }
 
     public async void SwitchVideo(string id)
     {
         Console.WriteLine("Switching video to ID: " + id);
-        await hubConnection.SendAsync("SyncVideo", id, 0, playlist.Count);
+        await hubConnection.SendAsync("SyncVideo", roomName, id, 0, playlist.Count);
         await JSRuntime.InvokeVoidAsync("player.loadVideoById", id);
         currentId = id;
         StateHasChanged();

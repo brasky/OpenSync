@@ -1,86 +1,111 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
+using OpenSync.Shared.Models;
 
 namespace OpenSync.Server.Hubs
 {
+    public static class RoomHandler
+    {
+        //List of all rooms
+        public static HashSet<Room> Rooms = new HashSet<Room>();
+    }
+
     public static class UserHandler
     {
-        public static HashSet<string> ConnectedIds = new HashSet<string>();
-
-        public static string Leader = string.Empty;
+        public static IDictionary<string, User> ConnectionUserMapping = new Dictionary<string, User>();
+        public static IDictionary<User, Room> UserRoomMapping = new Dictionary<User, Room>();
     }
 
     public class SyncHub : Hub
     {
+
         public async override Task OnConnectedAsync()
         {
-            UserHandler.ConnectedIds.Add(Context.ConnectionId);
-            await GetLeader();
+            string roomName = Context.GetHttpContext().Request.Query["room"];
+            var user = new User(Context.ConnectionId);
+            UserHandler.ConnectionUserMapping.Add(Context.ConnectionId, user);
+
+            var room = new Room(roomName, user);
+            await Groups.AddToGroupAsync(user.ConnectionId, room.Name);
+
+            if (RoomHandler.Rooms.Contains(room))
+            {
+                RoomHandler.Rooms.TryGetValue(room, out room);
+                room.Members.Add(user);
+                UserHandler.UserRoomMapping.Add(user, room);
+            }
+            else
+            {
+                RoomHandler.Rooms.Add(room);
+                UserHandler.UserRoomMapping.Add(user, room);
+            }
+
+            await SendLeader(room.Name);
             await base.OnConnectedAsync();
         }
 
         public async override Task OnDisconnectedAsync(Exception exception)
         {
-            UserHandler.ConnectedIds.Remove(Context.ConnectionId);
-            if (UserHandler.Leader == Context.ConnectionId)
+            UserHandler.ConnectionUserMapping.TryGetValue(Context.ConnectionId, out User user);
+            UserHandler.ConnectionUserMapping.Remove(Context.ConnectionId);
+
+            UserHandler.UserRoomMapping.TryGetValue(user, out Room room);
+            UserHandler.UserRoomMapping.Remove(user);
+
+            room.Members.Remove(user);
+            if (room.Leader.ConnectionId == user.ConnectionId)
             {
-                if (UserHandler.ConnectedIds.Count > 0)
-                {
-                    UserHandler.Leader = UserHandler.ConnectedIds.First();
-                }
-                else
-                {
-                    UserHandler.Leader = string.Empty;
-                }
+                room.AssignLeader();
+                await SendLeader(room.Name);
             }
-            await GetLeader();
+
+            await Groups.RemoveFromGroupAsync(user.ConnectionId, room.Name);
             await base.OnDisconnectedAsync(exception);
         }
 
-        public async Task SyncVideo(string id, int timestamp, int playlistSize)
+        public async Task SyncVideo(string roomName, string id, int timestamp, int playlistSize)
         {
-            if (Context.ConnectionId != UserHandler.Leader) return;
-            await Clients.Others.SendAsync("ReceiveSync", id, timestamp, playlistSize);
+            var room = RoomHandler.Rooms.Where(r => r.Name == roomName).First();
+            if (Context.ConnectionId != room.Leader.ConnectionId) return;
+            await Clients.GroupExcept(room.Name, room.Leader.ConnectionId).SendAsync("ReceiveSync", id, timestamp, playlistSize);   
         }
 
-        public async Task NewVideo(string id, int timestamp)
+        public async Task NewVideo(string roomName, string id, int timestamp)
         {
-            await Clients.All.SendAsync("ReceiveNewVideo", id, timestamp);
+            await Clients.Group(roomName).SendAsync("ReceiveNewVideo", id, timestamp);
         }
 
-        public async Task PauseStatus(bool isPaused, int timestamp)
+        public async Task PauseStatus(string roomName, bool isPaused, int timestamp)
         {
-            if (Context.ConnectionId != UserHandler.Leader) return;
-            await Clients.Others.SendAsync("ReceivePauseStatus", isPaused, timestamp);
+            var room = RoomHandler.Rooms.Where(r => r.Name == roomName).First();
+            if (Context.ConnectionId != room.Leader.ConnectionId) return;
+            await Clients.GroupExcept(roomName, room.Leader.ConnectionId).SendAsync("ReceivePauseStatus", isPaused, timestamp);
         }
 
-        public async Task SendPlaylist(List<string> playlist, string id, int timestamp)
+        public async Task SendPlaylist(string roomName, List<string> playlist, string id, int timestamp)
         {
-            await Clients.Others.SendAsync("ReceivePlaylist", playlist, id, timestamp);
+            await Clients.GroupExcept(roomName, Context.ConnectionId).SendAsync("ReceivePlaylist", playlist, id, timestamp);
         }
 
-        public async Task PlaylistRequest()
+        public async Task PlaylistRequest(string roomName)
         {
-            await Clients.Others.SendAsync("PlaylistRequest");
+            await Clients.GroupExcept(roomName, Context.ConnectionId).SendAsync("PlaylistRequest");
         }
 
-        public async Task GetLeader()
+        public async Task SendLeader(string roomName)
         {
-            if (string.IsNullOrEmpty(UserHandler.Leader))
+            var room = RoomHandler.Rooms.Where(r => r.Name == roomName).First();
+            if (string.IsNullOrEmpty(room.Leader.ConnectionId))
             {
-                UserHandler.Leader = Context.ConnectionId;
+                room.AssignLeader();
             }
 
-            if (!UserHandler.ConnectedIds.Any())
-            {
-                UserHandler.Leader = string.Empty;
-            }
-            
-            await Clients.All.SendAsync("Leader", UserHandler.Leader);
-            
+            await Clients.Group(roomName).SendAsync("Leader", room.Leader.ConnectionId);
+
         }
     }
 }
