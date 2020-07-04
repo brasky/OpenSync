@@ -56,11 +56,18 @@ namespace OpenSync.Server.Hubs
             UserHandler.UserRoomMapping.TryGetValue(user, out Room room);
             UserHandler.UserRoomMapping.Remove(user);
 
-            room.Members.Remove(user);
-            if (room.Leader.ConnectionId == user.ConnectionId)
+            if (room.Members.Count >= 1)
             {
-                room.AssignLeader();
-                await SendLeader(room.Name);
+                room.Members.Remove(user);
+                if (room.Leader.ConnectionId == user.ConnectionId)
+                {
+                    room.AssignLeader();
+                    await SendLeader(room.Name);
+                }
+            }
+            else
+            {
+                RoomHandler.Rooms.Remove(room);
             }
 
             await Groups.RemoveFromGroupAsync(user.ConnectionId, room.Name);
