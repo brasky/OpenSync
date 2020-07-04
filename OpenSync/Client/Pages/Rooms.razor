@@ -1,0 +1,52 @@
+﻿@page "/rooms"
+
+@using Microsoft.AspNetCore.SignalR.Client
+@using System.Threading;
+@using System.Net.Http;
+@inject HttpClient Http;
+@inject NavigationManager NavigationManager
+@inject IJSRuntime JSRuntime
+@implements IDisposable
+
+
+<h3>Rooms</h3>
+
+<ol>
+    @if (roomList != null)
+    {
+        @foreach (var room in roomList)
+        {
+            <li><a href="/room/@room">@room</a></li>
+        }
+    }
+</ol>
+
+
+@code {      
+
+    private HubConnection hubConnection;
+    private List<string> roomList;
+
+    protected override async Task OnInitializedAsync()
+    {
+        hubConnection = new HubConnectionBuilder()
+            .WithUrl(NavigationManager.ToAbsoluteUri($"/adminHub"))
+            .Build();
+
+        hubConnection.On<List<string>>("ReceiveRooms", (roomList) =>
+        {
+            Console.WriteLine("Received room list");
+            this.roomList = roomList;
+            StateHasChanged();
+        });
+
+        await hubConnection.StartAsync();
+        await hubConnection.SendAsync("GetAllRooms");
+        await base.OnInitializedAsync();
+    }
+
+    public void Dispose()
+    {
+        _ = hubConnection.DisposeAsync();
+    }
+}

@@ -63,6 +63,7 @@ namespace OpenSync.Server
                 endpoints.MapRazorPages();
                 endpoints.MapControllers();
                 endpoints.MapHub<SyncHub>("/syncHub");
+                endpoints.MapHub<AdminHub>("/adminHub");
                 endpoints.MapFallbackToFile("index.html");
             });
         }
