@@ -56,7 +56,7 @@ namespace OpenSync.Server.Hubs
             UserHandler.UserRoomMapping.TryGetValue(user, out Room room);
             UserHandler.UserRoomMapping.Remove(user);
 
-            if (room.Members.Count >= 1)
+            if (room.Members.Count > 1)
             {
                 room.Members.Remove(user);
                 if (room.Leader.ConnectionId == user.ConnectionId)
