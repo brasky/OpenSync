@@ -18,12 +18,15 @@
     </div>
 </div>
 
+
 <div class="form-group">
-    <label>
-        Video:
-        <input @bind="currentUrl" />
-    </label>
-    <button id="sendBtn" @onclick="Send" disabled="@(!IsConnected)">Send</button>
+    <form action="javascript:void(0);">
+        <label>
+            Video:
+            <input @bind="currentUrl" />
+        </label>
+        <button id="sendBtn" @onclick="Send" disabled="@(!IsConnected)">Send</button>
+    </form>
 </div>
 
 
