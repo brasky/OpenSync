@@ -44,6 +44,7 @@ namespace OpenSync.Server.Hubs
                 UserHandler.UserRoomMapping.Add(user, room);
             }
 
+            await Clients.Group(roomName).SendAsync("Members", room.Members.Select(u => u.Name).ToList());
             await SendLeader(room.Name);
             await base.OnConnectedAsync();
         }
@@ -106,13 +107,25 @@ namespace OpenSync.Server.Hubs
         public async Task SendLeader(string roomName)
         {
             var room = RoomHandler.Rooms.Where(r => r.Name == roomName).First();
-            if (string.IsNullOrEmpty(room.Leader.ConnectionId))
+            if (string.IsNullOrEmpty(room.Leader.Name))
             {
                 room.AssignLeader();
             }
 
-            await Clients.Group(roomName).SendAsync("Leader", room.Leader.ConnectionId);
+            await Clients.Group(roomName).SendAsync("Leader", room.Leader.Name);
 
+        }
+
+        public async Task SetUsername(string roomName, string name)
+        {
+            var room = RoomHandler.Rooms.Where(r => r.Name == roomName).First();
+            var user = room.Members.Where(u => u.ConnectionId == Context.ConnectionId).First();
+            user.Name = name;
+            if (room.Leader.ConnectionId == Context.ConnectionId)
+            {
+                await SendLeader(roomName);
+            }
+            await Clients.Group(roomName).SendAsync("Members", room.Members.Select(u => u.Name).ToList());
         }
     }
 }

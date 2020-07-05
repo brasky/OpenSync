@@ -19,12 +19,37 @@ html, body {
 #sendBtn {
     display: inline;
 }
-.iframe-container {
-    overflow: hidden;
-    padding-top: 51%;
-    position: relative;
-    top: 15px;
-    min-width: 1000px;
+
+@media only screen and (min-width: 2500px) {
+    .iframe-container {
+        overflow: hidden;
+        padding-top: 51%;
+        position: relative;
+        top: 15px;
+        max-width: 2000px;
+    }
+}
+@media only screen and (max-width: 2499px) {
+    .iframe-container {
+        overflow: hidden;
+        padding-top: 51%;
+        position: relative;
+        top: 15px;
+        max-width: 1500px;
+    }
+}
+
+.members {
+    display:none;
+}
+
+@media only screen and (min-width: 2000px) {
+    .members {
+        position: absolute;
+        top: 100px;
+        right: 100px;
+        display: block;
+    }
 }
 
 .playlist {

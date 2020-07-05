@@ -10,12 +10,47 @@
 
 
 <h3><a href="">OpenSync</a></h3>
-<h4>Your ID: @hubConnection.ConnectionId</h4>
-<h4>Leader: @Leader</h4>
 
 <div class="iframe-container">
     <div id="ytplayer">
     </div>
+</div>
+
+<div class="members">
+    @if (!string.IsNullOrEmpty(UsernameErrorText))
+    {
+        <div style="color: red;">@UsernameErrorText</div>
+    }
+    <form action="javascript:void(0);">
+        <label>
+            Username:
+            <input placeholder="Enter a username..." @bind="NewUsername" />
+        </label>
+        <button id="username" @onclick="SetUsername">Update</button>
+    </form>
+
+    <h5>Members:</h5>
+    <ul>
+        @foreach (var member in Members)
+        {
+            if ((member == hubConnection.ConnectionId || member == Username) && (member == Leader || member == LeaderUsername))
+            {
+                <li>Leader: @member (you)</li>
+            }
+            else if (member == Leader || member == LeaderUsername)
+            {
+                <li>Leader: @member</li>
+            }
+            else if (member == hubConnection.ConnectionId || member == Username)
+            {
+                <li>@member (you)</li>
+            }
+            else
+            {
+                <li>@member</li>
+            }
+        }
+    </ul>
 </div>
 
 
@@ -82,6 +117,11 @@
     private Dictionary<string, string> videoTitles = new Dictionary<string, string>();
     private Dictionary<string, string> videoThumbs = new Dictionary<string, string>();
     public string Leader = string.Empty;
+    public string LeaderUsername = string.Empty;
+    public List<string> Members = new List<string>();
+    public string Username = string.Empty;
+    public string NewUsername = string.Empty;
+    public string UsernameErrorText = string.Empty;
 
 
     private enum playerStates
@@ -234,15 +274,22 @@
             }
         });
 
-        hubConnection.On<string>("Leader", (connectionId) =>
+        hubConnection.On<string>("Leader", (name) =>
         {
-            Leader = connectionId;
+            Leader = name;
             if (hubConnection.ConnectionId.Equals(Leader) && !updating)
             {
                 StartUpdating();
             }
             StateHasChanged();
         });
+
+        hubConnection.On<List<string>>("Members", (members) =>
+        {
+            Members = members;
+            StateHasChanged();
+        });
+
         await hubConnection.StartAsync();
     }
 
@@ -459,7 +506,29 @@
         {
             Console.WriteLine("Video thumbnail is already in videoThumbs");
         }
+    }
 
+    public async void SetUsername()
+    {
+        if (string.IsNullOrEmpty(NewUsername))
+        {
+            UsernameErrorText = "Please enter a non-empty username...";
+            return;
+        }
+
+        if (Members.Contains(NewUsername))
+        {
+            UsernameErrorText = "Please choose a username that isn't taken";
+            NewUsername = string.Empty;
+        }
+        else
+        {
+            await hubConnection.SendAsync("SetUsername", roomName, NewUsername);
+            Username = NewUsername;
+            NewUsername = string.Empty;
+            UsernameErrorText = string.Empty;
+        }
+        StateHasChanged();
     }
 }
 
