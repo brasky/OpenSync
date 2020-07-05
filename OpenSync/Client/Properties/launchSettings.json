@@ -15,7 +15,7 @@
       },
       "inspectUri": "{wsProtocol}://{url.hostname}:{url.port}/_framework/debug/ws-proxy?browser={browserInspectUri}"
     },
-    "BlazorApp2": {
+    "OpenSync": {
       "commandName": "Project",
       "launchBrowser": true,
       "environmentVariables": {
