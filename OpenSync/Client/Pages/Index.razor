@@ -1,23 +1,37 @@
 ﻿@page "/"
 @inject NavigationManager Navigation
+    <div class="container">
+        <div class="section">
+            <div class="row">
+                <form class="col s12 m12 l12" action="">
+                    <div class="input-field col s8 m7 l7 offset-s1 offset-m1 offset-l2">
+                        <i class="material-icons prefix">home</i>
+                        <input id="roomName" type="text" class="validate" @bind="roomName" required pattern="[A-Za-z0-9]{1,20}">
+                        <label for="roomName">Create or Join a Room:</label>
+                    </div>
+                    <div class="col s2 m4 l3 valign-wrapper">
+                        <p class="valign-wrapper">
+                            <button class="btn waves-effect waves-light" type="submit" @onclick="GoToRoom" name="action">
+                                Submit
+                                <i class="material-icons right">send</i>
+                            </button>
+                        </p>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 
-<h3>OpenSync</h3>
 
-<form action="">
-    <label>
-        Create/Join a Room:
-        <input type="text" name="name" @bind="roomName" required pattern="[A-Za-z0-9]{1,20}" />
-    </label>
-    <button type="submit" id="roomBtn" @onclick="GoToRoom">Submit</button>
-</form>
 
-@code {
 
-    private string roomName;
+    @code {
 
-    public void GoToRoom()
-    {
-        if (!string.IsNullOrEmpty(roomName)) Navigation.NavigateTo($"room/{roomName}");
+        private string roomName;
+
+        public void GoToRoom()
+        {
+            if (!string.IsNullOrEmpty(roomName)) Navigation.NavigateTo($"room/{roomName}");
+        }
+
     }
-
-}
