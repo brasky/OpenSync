@@ -72,6 +72,7 @@ namespace OpenSync.Server.Hubs
             }
 
             await Groups.RemoveFromGroupAsync(user.ConnectionId, room.Name);
+            await Clients.Group(room.Name).SendAsync("Members", room.Members.Select(u => u.Name).ToList());
             await base.OnDisconnectedAsync(exception);
         }
 
