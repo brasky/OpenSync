@@ -10,7 +10,7 @@
 
     <div>
         <div class="section">
-            <div class="row flex">
+            <div class="row">
                 <div class="col s12 m9 l9">
                     <div class="iframe-container">
                         <div id="ytplayer">
@@ -26,7 +26,7 @@
                         }
                         <form action="javascript:void(0);">
                             <div class="input-field col s8 m8 l7">
-                                <i class="material-icons prefix">home</i>
+                                <i class="material-icons prefix">person</i>
                                 <input id="userName" type="text" class="validate" @bind="NewUsername" required pattern="[A-Za-z0-9]{1,20}">
                                 <label for="userName">Username</label>
                             </div>
@@ -74,14 +74,21 @@
                 <div class="col s12 m6 l4">
                     <div class="form-group">
                         <form action="javascript:void(0);">
-                            <label>
-                                Video:
-                                <input @bind="currentUrl" />
-                            </label>
-                            <button class="btn waves-effect waves-light" type="submit" @onclick="Send" name="action" disabled="@(!IsConnected)">
-                                Add
-                                <i class="material-icons right">add</i>
-                            </button>
+                            <div class="input-field col s8 m8 l7">
+                                <i class="material-icons prefix">video_library</i>
+                                <input id="newVideo" type="text" class="validate" @bind="currentUrl">
+                                <label for="newVideo">YouTube Link</label>
+                            </div>
+                            <div class="col s2 m4 l4 valign-wrapper">
+                                <p class="valign-wrapper">
+                                    <button class="btn waves-effect waves-light" type="submit" @onclick="Send" name="action" disabled="@(!IsConnected)">
+                                        Add
+                                        <i class="material-icons right">
+                                            add
+                                        </i>
+                                    </button>
+                                </p>
+                            </div>
                         </form>
                     </div>
                 </div>

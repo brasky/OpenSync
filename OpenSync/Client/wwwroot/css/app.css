@@ -23,46 +23,24 @@ ul, li {
     padding-right: 70px;
 }
 
-/*.bi-trash {
-    margin-left: 10px;
+@media only screen and (max-width: 1130px){
+    .iframe-container iframe {
+        width: 100%;
+        height: 400px;
+    }
 }
 
-
-.playlist {
-    position: relative;
-    bottom: 125px;
-    min-width:300px;
-    overflow:scroll;
-
-}
-
-input {
-    width: 100%;
-}
-
-.form-group > label {
-    width: 15%;
-}*/
-
-.iframe-container iframe {
-    width: 100%;
-    height: 500px;
+@media only screen and (min-width: 1131px){
+    .iframe-container iframe {
+        width: 100%;
+        height: 650px;
+    }
 }
 
 /* 4x3 Aspect Ratio */
 .iframe-container-4x3 {
     padding-top: 75%;
 }
-
-/*a, .btn-link {
-    color: #0366d6;
-}
-
-.btn-primary {
-    color: #fff;
-    background-color: #1b6ec2;
-    border-color: #1861ac;
-}*/
 
 app {
     position: relative;
