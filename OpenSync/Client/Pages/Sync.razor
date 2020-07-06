@@ -72,6 +72,10 @@
         <div class="section">
             <div class="row">
                 <div class="col s12 m6 l4">
+                    @if (!string.IsNullOrEmpty(NewVideoErrorText))
+                    {
+                        <div style="color: red;">@NewVideoErrorText</div>
+                    }
                     <div class="form-group">
                         <form action="javascript:void(0);">
                             <div class="input-field col s8 m8 l7">
@@ -186,6 +190,7 @@
         public string Username = "Anonymous";
         public string NewUsername = string.Empty;
         public string UsernameErrorText = string.Empty;
+        public string NewVideoErrorText = string.Empty;
 
 
         private enum playerStates
@@ -409,6 +414,13 @@
 
         async Task Send()
         {
+            if (!IsValidUrl(currentUrl))
+            {
+                NewVideoErrorText = "Please enter a valid URL";
+                return;
+            }
+            NewVideoErrorText = string.Empty;
+
             int timestamp = 0;
             if (ContainsTimestamp(currentUrl))
             {
@@ -477,6 +489,11 @@
             {
                 SwitchVideo(playlist[index + 1]);
             }
+        }
+
+        public bool IsValidUrl(string Url)
+        {
+            return Url.Contains("https://www.youtube.com") || Url.Contains("https://youtu.be") || Url.Contains("https://youtube.com");
         }
 
         public string GetId(string Url)
