@@ -11,7 +11,7 @@
         public User(string connectionId)
         {
             ConnectionId = connectionId;
-            Name = ConnectionId;
+            Name = "Anonymous_" + connectionId.Substring(connectionId.Length - 4);
         }
 
         public User(string connectionId, string name)

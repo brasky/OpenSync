@@ -23,14 +23,14 @@ ul, li {
     padding-right: 70px;
 }
 
-@media only screen and (max-width: 1130px){
+@media only screen and (max-width: 1310px){
     .iframe-container iframe {
         width: 100%;
         height: 400px;
     }
 }
 
-@media only screen and (min-width: 1131px){
+@media only screen and (min-width: 1311px){
     .iframe-container iframe {
         width: 100%;
         height: 650px;
@@ -40,6 +40,15 @@ ul, li {
 /* 4x3 Aspect Ratio */
 .iframe-container-4x3 {
     padding-top: 75%;
+}
+
+.nonActiveVideo, .activeVideo {
+    float: right;
+
+}
+
+.row > a {
+    width: 100%;
 }
 
 app {
